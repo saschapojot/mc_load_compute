@@ -177,7 +177,7 @@ void mc_computation::search_pkl(std::string& L_lastPklFile,std::string &y0_lastP
 /// @param y0Curr
 /// @param z0Curr
 /// @param y1Curr
-void mc_computation::initialization(double &LCurr, double &y0Curr, double &z0Curr, double &y1Curr){
+void mc_computation::initializeParams(double &LCurr, double &y0Curr, double &z0Curr, double &y1Curr){
     double a = 10;
     LCurr=2*a;
 
@@ -190,14 +190,215 @@ void mc_computation::initialization(double &LCurr, double &y0Curr, double &z0Cur
 
 }
 
+
+
+
 ///
-/// @param L
-/// @param y0
-/// @param z0
-/// @param y1
-/// @return
-double mc_computation::f(const double &L,const double& y0, const double &z0, const double&y1){
-    return this->beta * ((*potFuncPtr)(L,y0,z0,y1));
+/// @param LInit initial value of L
+/// @param y0Init initial value of y0
+/// @param z0Init initial value of z0
+/// @param y1Init initial value of y1
+void mc_computation::execute_mc(const double& LInit,const double &y0Init, const double &z0Init, const double& y1Init, const size_t & loopInit, const size_t & flushNum) {
+    double LCurr=LInit;
+    double y0Curr=y0Init;
+    double z0Curr=z0Init;
+    double y1Curr=y1Init;
+    double UCurr=(*potFuncPtr)(LCurr,y0Curr,z0Curr,y1Curr);
+
+    std::random_device rd;
+    std::ranlux24_base e2(rd());
+    std::uniform_real_distribution<> distUnif01(0, 1);//[0,1)
+    size_t loopStart = loopInit;
+    for(size_t fls=0;fls<flushNum;fls++) {
+        const auto tMCStart{std::chrono::steady_clock::now()};
+
+        for (size_t j = 0; j < loopToWrite; j++) {
+            //propose a move
+            double LNext;
+            double y0Next;
+            double z0Next;
+            double y1Next;
+            this->proposal(LCurr, y0Curr, z0Curr, y1Curr, LNext, y0Next, z0Next, y1Next);
+            double UNext;
+            double r = acceptanceRatio(LCurr, y0Curr, z0Curr, y1Curr, UCurr, LNext, y0Next, z0Next, y1Next, UNext);
+            double u = distUnif01(e2);
+            if (u <= r) {
+                LCurr = LNext;
+                y0Curr = y0Next;
+                z0Curr = z0Next;
+                y1Curr = y1Next;
+                UCurr = UNext;
+
+            }//end of accept-reject
+
+            U_ptr[j] = UCurr;
+            L_ptr[j] = LCurr;
+            y0_ptr[j] = y0Curr;
+            z0_ptr[j] = z0Curr;
+            y1_ptr[j] = y1Curr;
+        }//end for loop
+
+
+        size_t loopEnd = loopStart + (fls+1)*loopToWrite - 1;
+
+        std::string fileNameMiddle = "loopStart" + std::to_string(loopStart) + "loopEnd" + std::to_string(loopEnd);
+        //save U_ptr
+        std::string out_UPickleFileName = this->U_dataFolder + "/" + fileNameMiddle + ".U.pkl";
+        save_array_to_pickle(U_ptr, loopToWrite, out_UPickleFileName);
+
+        //save L_ptr
+        std::string out_LPickleFileName = L_dataFolder + "/" + fileNameMiddle + ".L.pkl";
+        save_array_to_pickle(L_ptr, loopToWrite, out_LPickleFileName);
+
+        //save y0_ptr
+        std::string out_y0PickleFileName = y0_dataFolder + "/" + fileNameMiddle + ".y0.pkl";
+        save_array_to_pickle(y0_ptr, loopToWrite, out_y0PickleFileName);
+
+        //save z0_ptr
+        std::string out_z0PickleFileName = z0_dataFolder + "/" + fileNameMiddle + ".z0.pkl";
+        save_array_to_pickle(z0_ptr, loopToWrite, out_z0PickleFileName);
+
+        //save y1_ptr
+        std::string out_y1PickleFileName = y1_dataFolder + "/" + fileNameMiddle + ".y1.pkl";
+        save_array_to_pickle(y1_ptr, loopToWrite, out_y1PickleFileName);
+
+        const auto tMCEnd{std::chrono::steady_clock::now()};
+        const std::chrono::duration<double> elapsed_secondsAll{tMCEnd - tMCStart};
+        std::cout<<"loop "+std::to_string(loopStart)+" to loop "+std::to_string(loopEnd)+": "<<elapsed_secondsAll.count()/3600.0 << " h" << std::endl;
+
+        loopStart=loopEnd+1;
+
+    }//end flush for loop
+
+}
+
+
+///
+/// @param LCurr current value of L
+/// @param y0Curr current value of y0
+/// @param z0Curr current value of z0
+/// @param y1Curr current value of y1
+/// @param LNext  next value of L
+/// @param y0Next next value of y0
+/// @param z0Next next value of z0
+/// @param y1Next next value of y1
+void mc_computation::proposal(const double &LCurr, const double& y0Curr,const double& z0Curr, const double& y1Curr,
+              double & LNext, double & y0Next, double & z0Next, double & y1Next){
+
+//next L
+LNext= generate_nearby_normal(LCurr,this->h);
+
+//next y0
+y0Next= generate_nearby_normal(y0Curr,this->h);
+
+//next z0
+z0Next= generate_nearby_normal(z0Curr,this->h);
+
+//next y1
+y1Next= generate_nearby_normal(y1Curr,this->h);
+
+}
+
+double mc_computation::acceptanceRatio(const double &LCurr,const double &y0Curr,
+                                              const double &z0Curr, const double& y1Curr,const double& UCurr,
+                                              const double &LNext, const double& y0Next,
+                                              const double & z0Next, const double & y1Next,
+                                              double &UNext){
+
+    UNext=((*potFuncPtr)(LNext,y0Next,z0Next,y1Next));
+
+    double numerator = -this->beta*UNext;
+
+    double denominator=-this->beta*UCurr;
+
+    double ratio = std::exp(numerator - denominator);
+
+    return std::min(1.0, ratio);
+
+}
+
+void mc_computation::loadParams(double &LCurr, double &y0Curr, double &z0Curr, double &y1Curr,
+                const std::string & L_lastPklFile, const std::string &y0_lastPklFile,
+                const std::string &z0_lastPklFile, const std::string & y1_lastPklFile){
+
+    //load L
+    size_t last_L_size;
+    std::shared_ptr<double[]> last_L_ptr=load_array_from_pickle(last_L_size,L_lastPklFile);
+    LCurr=last_L_ptr[last_L_size-1];
+
+    //load y0
+    size_t  last_y0_size;
+    std::shared_ptr<double[]> last_y0_ptr=load_array_from_pickle(last_y0_size,y0_lastPklFile);
+    y0Curr=last_y0_ptr[last_y0_size-1];
+
+    //load z0
+    size_t last_z0_size;
+    std::shared_ptr<double[]> last_z0_ptr= load_array_from_pickle(last_z0_size,z0_lastPklFile);
+    z0Curr=last_z0_ptr[last_z0_size-1];
+
+    //load y1
+    size_t  last_y1_size;
+    std::shared_ptr<double[]> last_y1_ptr= load_array_from_pickle(last_y1_size,y1_lastPklFile);
+    y1Curr=last_y1_ptr[last_y1_size-1];
+
+
+
+
+}
+
+void mc_computation::strategy(double &LInit, double &y0Init, double &z0Init, double& y1Init, size_t& flushNum,size_t & loopInit) {
+
+    std::string L_lastPklFile;
+    std::string y0_lastPklFile;
+    std::string z0_lastPklFile;
+    std::string y1_lastPklFile;
+
+    search_pkl(L_lastPklFile, y0_lastPklFile, z0_lastPklFile, y1_lastPklFile);
+    std::cout<<"L_lastPklFile="<<L_lastPklFile<<std::endl;
+    if (L_lastPklFile == "" and y0_lastPklFile == "" and z0_lastPklFile == ""
+        and y1_lastPklFile == "") {
+        this->initializeParams(LInit, y0Init, z0Init, y1Init);
+        flushNum = defaultFlushNum;
+        loopInit = 0;
+        return;
+    } else {
+        this->loadParams(LInit, y0Init, z0Init, y1Init, L_lastPklFile,
+                         y0_lastPklFile, z0_lastPklFile, y1_lastPklFile);
+        flushNum = defaultFlushNum;
+        std::regex lpEndRegex("loopEnd(\\d+)");
+        std::smatch matchLpEnd;
+        if (std::regex_search(L_lastPklFile, matchLpEnd, lpEndRegex)) {
+
+            loopInit = std::stoull(matchLpEnd.str(1)) + 1;
+        }
+
+
+        return;
+
+    }
+
+
+}
+
+
+void mc_computation::load_init_run(){
+    double LInit;
+    double y0Init;
+    double z0Init;
+    double y1Init;
+    size_t flushNum;
+    size_t loopInit;
+
+    this->strategy(LInit,y0Init,z0Init,y1Init,flushNum,loopInit);
+    std::cout<<"LInit="<<LInit<<std::endl;
+    std::cout<<"y0Init="<<y0Init<<std::endl;
+    std::cout<<"z0Init="<<z0Init<<std::endl;
+    std::cout<<"y1Init="<<y1Init<<std::endl;
+    std::cout<<"flushNum="<<flushNum<<std::endl;
+    std::cout<<"loopInit="<<loopInit<<std::endl;
+
+    execute_mc(LInit,y0Init,z0Init,y1Init,loopInit,flushNum);
+
 
 
 }

@@ -23,18 +23,6 @@ int main(int argc, char *argv[]) {
 
     std::string observableName = std::string(argv[2]);
 
-    std::string x = "qwmn12";
-    std::string y = "45iuqw";
-
-    std::regex qwR("(\\d+)");
-    std::smatch mc;
-
-    if (std::regex_search(x, mc, qwR)) {
-        std::cout << mc.str(1) << std::endl;
-    }
-
-    if (std::regex_search(y, mc, qwR)) {
-        std::cout << mc.str(1) << std::endl;
-    }
-
+    auto mcObj = mc_computation(T, std::make_shared<quadratic>(), observableName);
+    mcObj.load_init_run();
 }

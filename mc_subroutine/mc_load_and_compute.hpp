@@ -84,10 +84,14 @@ public:
         this->beta = 1 / T;
         this->potFuncPtr = funcPtr;
 
+        double stepForT1 = 0.1;
+        this->h = stepForT1 * T>0.2? 0.2:stepForT1 * T;//stepSize;
+        std::cout << "h=" << h << std::endl;
 
 
 
 
+    ///create directories if not exist
 
      this->funcName = this->demangle(typeid(*potFuncPtr).name());
      this->observable=observableName;
@@ -155,6 +159,27 @@ public:
         }
 
 
+        ///allocate arrays
+        try {
+            U_ptr = std::shared_ptr<double[]>(new double[loopToWrite],
+                                              std::default_delete<double[]>());
+            L_ptr = std::shared_ptr<double[]>(new double[loopToWrite],
+                                              std::default_delete<double[]>());
+            y0_ptr = std::shared_ptr<double[]>(new double[loopToWrite],
+                                               std::default_delete<double[]>());
+            z0_ptr = std::shared_ptr<double[]>(new double[loopToWrite],
+                                               std::default_delete<double[]>());
+            y1_ptr = std::shared_ptr<double[]>(new double[loopToWrite],
+                                               std::default_delete<double[]>());
+
+
+        }
+        catch (const std::bad_alloc &e) {
+            std::cerr << "Memory allocation error: " << e.what() << std::endl;
+        } catch (const std::exception &e) {
+            std::cerr << "Exception: " << e.what() << std::endl;
+        }
+
     }
 
 
@@ -173,25 +198,84 @@ public:
         return result;
     }
 
-    void execute_mc();
+    void load_init_run();
 
+    ///
+    /// @param LInit initial value of L
+    /// @param y0Init initial value of y0
+    /// @param z0Init initial value of z0
+    /// @param y1Init initial value of y1
+    /// @param flushNum files to write
+    void execute_mc(const double& LInit,const double &y0Init, const double &z0Init, const double& y1Init, const size_t & loopInit, const size_t & flushNum);
+
+
+    ///
+    /// @param LCurr current value of L
+    /// @param y0Curr current value of y0
+    /// @param z0Curr current value of z0
+    /// @param y1Curr current value of y1
+    /// @param LNext  next value of L
+    /// @param y0Next next value of y0
+    /// @param z0Next next value of z0
+    /// @param y1Next next value of y1
+    void proposal(const double &LCurr, const double& y0Curr,const double& z0Curr, const double& y1Curr,
+                  double & LNext, double & y0Next, double & z0Next, double & y1Next);
+
+
+    ///
+    /// @param x
+    /// @param sigma
+    /// @return a value around x, from a  normal distribution
+    static double generate_nearby_normal(const double & x, const double &sigma){
+        std::random_device rd;  // Random number generator
+        std::mt19937 gen(rd()); // Mersenne Twister engine
+        std::normal_distribution<> d(x, sigma); // Normal distribution with mean rCurr and standard deviation sigma
+
+        double xNext = d(gen);
+
+
+        return xNext;
+
+
+    }
 
     ///
     /// @param LCurr
     /// @param y0Curr
     /// @param z0Curr
     /// @param y1Curr
-    void initialization(double &LCurr, double &y0Curr, double &z0Curr, double &y1Curr);
-
-
+    /// @param LNext
+    /// @param y0Next
+    /// @param z0Next
+    /// @param y1Next
+    /// @param UNext
+    /// @return
+    double acceptanceRatio(const double &LCurr,const double &y0Curr,
+                           const double &z0Curr, const double& y1Curr,const double& UCurr,
+                           const double &LNext, const double& y0Next,
+                           const double & z0Next, const double & y1Next,
+                           double &UNext);
 
     ///
-    /// @param L
-    /// @param y0
-    /// @param z0
-    /// @param y1
-    /// @return
-    double f(const double &L,const double& y0, const double &z0, const double&y1);
+    /// @param LCurr
+    /// @param y0Curr
+    /// @param z0Curr
+    /// @param y1Curr
+    void initializeParams(double &LCurr, double &y0Curr, double &z0Curr, double &y1Curr);
+
+    ///
+    /// @param LCurr
+    /// @param y0Curr
+    /// @param z0Curr
+    /// @param y1Curr
+    /// @param L_lastPklFile
+    /// @param y0_lastPklFile
+    /// @param z0_lastPklFile
+    /// @param y1_lastPklFile
+    void loadParams(double &LCurr, double &y0Curr, double &z0Curr, double &y1Curr,
+                    const std::string & L_lastPklFile, const std::string &y0_lastPklFile,
+                    const std::string &z0_lastPklFile, const std::string & y1_lastPklFile);
+
     ///
     /// @param L_lastPklFile
     /// @param y0_lastPklFile
@@ -199,6 +283,9 @@ public:
     /// @param y1_lastPklFile
     void search_pkl(std::string& L_lastPklFile,std::string &y0_lastPklFile,
                 std::string& z0_lastPklFile,std::string & y1_lastPklFile);
+
+
+    void strategy(double &LInit, double &y0Init, double &z0Init, double& y1Init, size_t& flushNum,size_t & loopInit);
 
     ///
     /// @param lastLoopEnd last file's loopEnd
@@ -252,7 +339,7 @@ public:
             }
 
             // Serialize the list using pickle.dumps
-            object serialized_array = pickle_dumps(py_list);
+            object serialized_array = pickle_dumps(py_list, 2);  // Use protocol 2 for binary compatibility
 
             // Extract the serialized data as a string
             std::string serialized_str = extract<std::string>(serialized_array);
@@ -260,7 +347,7 @@ public:
             // Write the serialized data to a file
             std::ofstream file(filename, std::ios::binary);
             if (!file) {
-                throw std::runtime_error("Failed to open file for writing");
+                throw std::runtime_error("Failed to open file for writing: " + filename);
             }
             file.write(serialized_str.data(), serialized_str.size());
             file.close();
@@ -269,7 +356,7 @@ public:
             std::cout << "Array serialized and written to file successfully." << std::endl;
         } catch (const error_already_set&) {
             PyErr_Print();
-            std::cerr << "Boost.Python error occurred." << std::endl;
+            std::cerr << "Boost.Python error occurred while saving array to pickle file." << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "Exception: " << e.what() << std::endl;
         }
@@ -280,9 +367,10 @@ public:
     }
 
 
-   static std::shared_ptr<double[]> load_array_from_pickle(std::size_t& size, const std::string& filename) {
+    static std::shared_ptr<double[]> load_array_from_pickle(std::size_t& size, const std::string& filename) {
         using namespace boost::python;
         std::shared_ptr<double[]> ptr;
+
         try {
             Py_Initialize();  // Initialize the Python interpreter
             if (!Py_IsInitialized()) {
@@ -299,13 +387,16 @@ public:
             // Read the serialized data from the file
             std::ifstream file(filename, std::ios::binary);
             if (!file) {
-                throw std::runtime_error("Failed to open file for reading");
+                throw std::runtime_error("Failed to open file for reading: " + filename);
             }
-            std::string serialized_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            std::vector<char> buffer((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
             file.close();
 
+            // Create a Python bytes object from the buffer
+            object py_bytes = object(handle<>(PyBytes_FromStringAndSize(buffer.data(), buffer.size())));
+
             // Deserialize the data using pickle.loads
-            object py_list = pickle_loads(serialized_str);
+            object py_list = pickle_loads(py_bytes);
 
             // Get the size of the list
             size = len(py_list);
@@ -320,7 +411,7 @@ public:
             std::cout << "Array deserialized and loaded from file successfully." << std::endl;
         } catch (const error_already_set&) {
             PyErr_Print();
-            std::cerr << "Boost.Python error occurred." << std::endl;
+            std::cerr << "Boost.Python error occurred while loading array from pickle file." << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "Exception: " << e.what() << std::endl;
         }
@@ -335,7 +426,7 @@ public:
     double T;// temperature
     double beta;
 
-    static const size_t loopToWrite=100000;
+    static const size_t loopToWrite=1000000;
     double h;// step size
     std::shared_ptr<potentialFunction> potFuncPtr;
 
@@ -356,6 +447,12 @@ public:
     std::string observable;
     std::string TFolder;
     std::string summary_history_folder;
+
+    std::shared_ptr<double[]> U_ptr;
+    std::shared_ptr<double[]> L_ptr;
+    std::shared_ptr<double[]> y0_ptr;
+    std::shared_ptr<double[]> z0_ptr;
+    std::shared_ptr<double[]> y1_ptr;
 
 
 
