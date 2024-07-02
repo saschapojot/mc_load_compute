@@ -23,6 +23,6 @@ int main(int argc, char *argv[]) {
 
     std::string observableName = std::string(argv[2]);
 
-    auto mcObj = mc_computation(T, std::make_shared<quadratic>(), observableName);
+    auto mcObj = mc_computation(T, std::make_shared<quadratic>("row0"), observableName);
     mcObj.load_init_run();
 }

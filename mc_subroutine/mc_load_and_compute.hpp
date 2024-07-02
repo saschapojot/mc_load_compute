@@ -40,14 +40,18 @@ public:
 
 class quadratic : public potentialFunction {
 public:
-    quadratic() : potentialFunction() {
-        this->a1 = 1;
-        this->a2 = 1.5;
-        this-> c1 = 50;
-        this->c2 = 80;
+    quadratic(const std::string &row) : potentialFunction() {
+//        this->a1 = 1;
+//        this->a2 = 1.5;
+//        this-> c1 = 50;
+//        this->c2 = 80;
+        this->rowName = row;
+        this->parseParams();
 
-        this->paramStr = "a1_" + std::to_string(a1) + "a2_" + std::to_string(a2) + "c1_" + std::to_string(c1)
-                   + "c2_" + std::to_string(c2);
+
+        this->paramStr = rowName;
+        std::cout << "a1=" << a1 << ", a2=" << a2 << ", c1=" << c1 << ", c2=" << c2 << std::endl;
+
 
     }
 
@@ -65,6 +69,82 @@ public:
 
     }
 
+
+    void parseParams() {
+
+        std::regex rowRegex("(row\\d++)");
+        std::regex a1Regex("a1\\s*=\\s*([+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?)");
+        std::regex a2Regex("a2\\s*=\\s*([+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?)");
+        std::regex c1Regex("c1\\s*=\\s*([+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?)");
+        std::regex c2Regex("c2\\s*=\\s*([+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?)");
+
+        std::smatch matchRow;
+        std::smatch match_a1;
+        std::smatch match_a2;
+        std::smatch match_c1;
+        std::smatch match_c2;
+
+        std::ifstream file(inParamsFile);
+        if (!file.is_open()) {
+            std::cerr << "Error opening file: " << inParamsFile << std::endl;
+            std::exit(1);
+        }
+        bool rowFound = false;
+        std::string line;
+        while (std::getline(file, line)) {
+            // Process the line (e.g., print it)
+//            std::cout << line << std::endl;
+            //match row
+            if (std::regex_search(line, matchRow, rowRegex)) {
+                if (rowName == matchRow.str(1)) {
+                    rowFound = true;
+                }
+
+                //match params
+                //match a1
+                if (std::regex_search(line, match_a1, a1Regex)) {
+                    this->a1 = std::stod(match_a1.str(1));
+                } else {
+                    std::cerr << "a1 missing." << std::endl;
+                    std::exit(2);
+                }
+
+                //match a2
+                if (std::regex_search(line, match_a2, a2Regex)) {
+                    this->a2 = std::stod(match_a2.str(1));
+                } else {
+                    std::cerr << "a2 missing." << std::endl;
+                    std::exit(2);
+                }
+                //match c1
+                if (std::regex_search(line, match_c1, c1Regex)) {
+                    this->c1 = std::stod(match_c1.str(1));
+                } else {
+                    std::cerr << "c1 missing." << std::endl;
+                    std::exit(2);
+                }
+
+                //match c2
+                if (std::regex_search(line, match_c2, c2Regex)) {
+                    this->c2 = std::stod(match_c2.str(1));
+                } else {
+                    std::cerr << "c2 missing." << std::endl;
+                    std::exit(2);
+                }
+            }
+            break;
+
+        }//end of while
+
+        if (rowFound == false) {
+            std::cerr << rowName + " not found." << std::endl;
+            std::exit(3);
+        }
+    }// end of parseParams()
+
+
+
+
 public:
 
     double a1;
@@ -72,6 +152,8 @@ public:
     double c1;
     double c2;
     std::string paramStr;
+    std::string rowName;
+    std::string inParamsFile = "./inputData/quadratic/quadraticCoeffs.txt";
 
 };
 
@@ -152,11 +234,11 @@ public:
             fs::create_directories(summary_folder);
         }
 
-        this->summary_history_folder=summary_folder+"/summary_history/";
-        //create directory summary_history_folder if it does not exist
-        if (!fs::is_directory(summary_history_folder) || !fs::exists(summary_history_folder)) {
-            fs::create_directories(summary_history_folder);
-        }
+//        this->summary_history_folder=summary_folder+"/summary_history/";
+//        //create directory summary_history_folder if it does not exist
+//        if (!fs::is_directory(summary_history_folder) || !fs::exists(summary_history_folder)) {
+//            fs::create_directories(summary_history_folder);
+//        }
 
 
         ///allocate arrays
