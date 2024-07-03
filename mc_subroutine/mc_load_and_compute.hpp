@@ -14,6 +14,7 @@
 #include <cxxabi.h>
 #include <fstream>
 #include <initializer_list>
+#include <iomanip>
 #include <iostream>
 #include <math.h>
 #include <memory>
@@ -178,8 +179,17 @@ public:
      this->funcName = this->demangle(typeid(*potFuncPtr).name());
      this->observable=observableName;
 
+        // Using std::ostringstream to format the number without trailing zeros
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(15) << T;
+        std::string TStr = oss.str();
+        // Remove trailing zeros and potentially the trailing decimal point
+        TStr.erase(TStr.find_last_not_of('0') + 1, std::string::npos);
+        if (TStr.back() == '.') {
+            TStr.pop_back();
+        }
 
-     this->TFolder=data_root+"/"+funcName+"/"+potFuncPtr->getParamStr()+"/T"+std::to_string(T)+"/";
+     this->TFolder=data_root+"/"+funcName+"/"+potFuncPtr->getParamStr()+"/T"+TStr+"/";
 
         //create directory TFolder if it does not exist
         if (!fs::is_directory(TFolder) || !fs::exists(TFolder)) {

@@ -222,4 +222,4 @@ for k in range(0,len(sortedTFiles)):
     # print(oneTFolder)
     checkDataFilesForOneT(oneTFolder)
     tEnd=datetime.now()
-    print("processing T="+str(sortedTVals[k])+": ",tEnd-tStart)
+    print("processed T="+str(sortedTVals[k])+": ",tEnd-tStart)

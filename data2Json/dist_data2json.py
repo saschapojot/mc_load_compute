@@ -60,7 +60,7 @@ def parseSummary(oneTFolder,obs_name):
     smrFile=oneTFolder+"/summary_"+obs_name+"/summaryFile_"+obs_name+".txt"
     summaryFileExists=os.path.isfile(smrFile)
     if summaryFileExists==False:
-        return startingFileInd,startingVecPosition
+        return startingFileInd,startingVecPosition,-1
 
     # eq=False
     with open(smrFile,"r") as fptr:
@@ -155,6 +155,9 @@ for k in range(0,len(sortedTFiles)):
     lagAll=[]
     for oneObs in obsNamesAll:
         flIndTmp,vecIndTmp,lagTmp=parseSummary(oneTFolder,oneObs)
+        if flIndTmp<0:
+            print("summary file does not exist for "+oneTStr+" "+oneObs)
+            continue
         startingFileIndAll.append(flIndTmp)
         startingVecPositionAll.append(vecIndTmp)
         lagAll.append(lagTmp)
