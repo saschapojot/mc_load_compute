@@ -367,12 +367,10 @@ public:
                 std::string& z0_lastPklFile,std::string & y1_lastPklFile);
 
 
-    void strategy(double &LInit, double &y0Init, double &z0Init, double& y1Init, size_t& flushNum,size_t & loopInit);
+    void strategy(double &LInit, double &y0Init, double &z0Init, double& y1Init, size_t& flushNum,size_t & loopInit, bool&moreDataPointsAfterEq);
 
-    ///
-    /// @param lastLoopEnd last file's loopEnd
-    /// @param newFlushNum
-    void parseSummary(size_t &lastLoopEnd, size_t &newFlushNum);
+
+    void parseSummary(size_t &newFlushNum,bool&moreDataPointsAfterEq);
 
 
     ///

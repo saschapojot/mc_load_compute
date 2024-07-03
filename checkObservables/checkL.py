@@ -8,8 +8,8 @@ import warnings
 from scipy.stats import ks_2samp
 import glob
 from pathlib import Path
-
-#This script checks if  U values reach equilibrium and writes summary file of U
+import os
+#This script checks if  L values reach equilibrium and writes summary file of L
 
 if (len(sys.argv)!=3):
     print("wrong number of arguments")
@@ -63,6 +63,47 @@ def sort_data_files_by_lpStart(oneTFolder):
     sortedDataFiles=[dataFilesAll[i] for i in startInds]
 
     return sortedDataFiles
+def parseSummary(oneTFolder):
+    """
+
+    :param oneTFolder:
+    :return:
+    """
+
+    startingFileInd=-1
+    startingVecPosition=-1
+
+    smrFile=oneTFolder+"/summary_"+obs_name+"/summaryFile_"+obs_name+".txt"
+    summaryFileExists=os.path.isfile(smrFile)
+    if summaryFileExists==False:
+        return startingFileInd,startingVecPosition
+
+    # eq=False
+    with open(smrFile,"r") as fptr:
+        lines=fptr.readlines()
+    for oneLine in lines:
+        # #match equilibrium
+        # matchEq=re.search(r"equilibrium",oneLine)
+        # if matchEq:
+        #     eq=True
+
+        #match startingFileInd
+        matchStartingFileInd=re.search(r"startingFileInd=(\d+)",oneLine)
+        if matchStartingFileInd:
+            startingFileInd=int(matchStartingFileInd.group(1))
+        #match startingVecPosition
+        matchStartingVecPosition=re.search(r"startingVecPosition=(\d+)",oneLine)
+        if matchStartingVecPosition:
+            startingVecPosition=int(matchStartingVecPosition.group(1))
+
+    return startingFileInd, startingVecPosition
+
+
+
+
+
+
+
 
 
 def checkDataFilesForOneT(oneTFolder):
@@ -73,8 +114,11 @@ def checkDataFilesForOneT(oneTFolder):
     """
     TRoot=oneTFolder
     sortedDataFilesToRead=sort_data_files_by_lpStart(TRoot)
-
-    startingFileInd=int(len(sortedDataFilesToRead)*1/2)#we guess that the equilibrium starts within this data file
+    parsedStartingFileInd,parsedStartingVecPosition=parseSummary(oneTFolder)
+    if parsedStartingFileInd>0:
+        startingFileInd=parsedStartingFileInd
+    else:
+        startingFileInd=int(len(sortedDataFilesToRead)*1/2)#we guess that the equilibrium starts within this data file
     print("ind="+str(startingFileInd))
     startingFileName=sortedDataFilesToRead[startingFileInd]
     startingVecPosition=0
@@ -82,8 +126,12 @@ def checkDataFilesForOneT(oneTFolder):
     with open(startingFileName,"rb") as fptr:
         vec=np.array(pickle.load(fptr))
         lengthTmp=len(vec)
-        startingVecPosition=int(lengthTmp/2)#we guess that the equilibrium starts at this position
+        if parsedStartingVecPosition>0:
+            startingVecPosition=parsedStartingVecPosition
+        else:
+            startingVecPosition=int(lengthTmp/2)#we guess that the equilibrium starts at this position
         vecTruncated=vec[startingVecPosition:]
+
         print("startingVecPosition="+str(startingVecPosition))
 
     #read the rest of the data files
