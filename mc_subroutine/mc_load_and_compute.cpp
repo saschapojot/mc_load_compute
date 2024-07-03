@@ -1,29 +1,103 @@
 #include "mc_load_and_compute.hpp"
 
 
-///
-/// @param lastLoopEnd last file's loopEnd
-/// @param newFlushNum
-void mc_computation::parseSummary(size_t &lastLoopEnd, size_t &newFlushNum) {
+
+void mc_computation::parseSummary(size_t &newFlushNum,bool&moreDataPointsAfterEq) {
 
 //search for last_summary_observable.txt
 
     bool smrExists = false;
-    std::regex smrRegex("last_summary_" + observable + ".txt");
+    std::string fileName;
+    std::regex smrRegex("summaryFile_" + observable + ".txt");
     std::smatch matchSmr;
+    size_t lag = 0;
+    size_t newDataPointNum = 0;
     for (const auto &entry: fs::directory_iterator(this->summary_folder)) {
         if (std::regex_search(entry.path().string(), matchSmr, smrRegex)) {
             smrExists = true;
+            fileName = entry.path().string();
             break;
         }
 
 
     }
 
-    //search for last data file
+    //search for summary file
 
-    if (smrExists== false){
-        newFlushNum=defaultFlushNum;
+    if (smrExists == false) {
+        newFlushNum = defaultFlushNum;
+        moreDataPointsAfterEq = false;
+        return;
+    }
+
+    //parse summary file
+
+    std::regex eqRegex("equilibrium");
+    std::regex errRegex("error");
+    std::regex lagRegex("lag=(\\d+)");
+    std::regex newDataNum("newDataPointNum=(\\d+)");
+    std::regex continueRegex("continue");
+    std::regex highCorrRegex("high");
+
+    std::smatch matchEq;
+    std::smatch matchErr;
+    std::smatch matchLag;
+    std::smatch matchNewNum;
+    std::smatch matchContinue;
+    std::smatch matchHigh;
+
+
+    std::ifstream ifs(fileName);
+    if (!ifs.is_open()) {
+        std::cerr << "Error opening file: " << fileName << std::endl;
+        std::exit(1);
+    }
+
+    std::string line;
+    while (std::getline(ifs, line)) {
+        if (std::regex_search(line, matchErr, errRegex)) {
+            std::cerr << "error in previous computation, please re-run." << std::endl;
+            std::exit(10);
+        }//end of matching error
+
+        if (std::regex_search(line, matchEq, eqRegex)) {
+            continue;
+
+        }// end of matching equilibrium
+
+        if (std::regex_search(line, matchContinue, continueRegex)) {
+            newFlushNum = this->defaultFlushNum;
+            moreDataPointsAfterEq = false;
+            return;
+        }//end of matching continue
+
+        if (std::regex_search(line, matchHigh, highCorrRegex)) {
+            newFlushNum = this->defaultFlushNum;
+            moreDataPointsAfterEq = false;
+            return;
+        }//end of matching high
+
+        if (std::regex_search(line, matchLag, lagRegex)) {
+            lag = std::stoull(matchLag.str(1));
+        }//end of  matching lag
+
+        if (std::regex_search(line, matchNewNum, newDataNum)) {
+            newDataPointNum = std::stoull(matchNewNum.str(1));
+        }//end of matching newDataPointNum
+
+    }
+
+
+    if (newDataPointNum == 0) {
+        newFlushNum = 0;
+        moreDataPointsAfterEq = true;
+        return;
+    } else {
+        size_t totalNum = lag * newDataPointNum;
+        newFlushNum = static_cast<size_t>(std::ceil(
+                static_cast<double>(totalNum) / (static_cast<double>(loopToWrite))));
+        moreDataPointsAfterEq = true;
+        return;
     }
 
 
@@ -346,7 +420,7 @@ void mc_computation::loadParams(double &LCurr, double &y0Curr, double &z0Curr, d
 
 }
 
-void mc_computation::strategy(double &LInit, double &y0Init, double &z0Init, double& y1Init, size_t& flushNum,size_t & loopInit) {
+void mc_computation::strategy(double &LInit, double &y0Init, double &z0Init, double& y1Init, size_t& flushNum,size_t & loopInit,bool&moreDataPointsAfterEq) {
 
     std::string L_lastPklFile;
     std::string y0_lastPklFile;
@@ -354,17 +428,21 @@ void mc_computation::strategy(double &LInit, double &y0Init, double &z0Init, dou
     std::string y1_lastPklFile;
 
     search_pkl(L_lastPklFile, y0_lastPklFile, z0_lastPklFile, y1_lastPklFile);
-    std::cout<<"L_lastPklFile="<<L_lastPklFile<<std::endl;
+//    std::cout<<"L_lastPklFile="<<L_lastPklFile<<std::endl;
     if (L_lastPklFile == "" and y0_lastPklFile == "" and z0_lastPklFile == ""
         and y1_lastPklFile == "") {
         this->initializeParams(LInit, y0Init, z0Init, y1Init);
         flushNum = defaultFlushNum;
         loopInit = 0;
+        moreDataPointsAfterEq= false;
         return;
     } else {
+        this->parseSummary(flushNum,moreDataPointsAfterEq);
+
         this->loadParams(LInit, y0Init, z0Init, y1Init, L_lastPklFile,
                          y0_lastPklFile, z0_lastPklFile, y1_lastPklFile);
-        flushNum = defaultFlushNum;
+
+
         std::regex lpEndRegex("loopEnd(\\d+)");
         std::smatch matchLpEnd;
         if (std::regex_search(L_lastPklFile, matchLpEnd, lpEndRegex)) {
@@ -381,24 +459,41 @@ void mc_computation::strategy(double &LInit, double &y0Init, double &z0Init, dou
 }
 
 
-void mc_computation::load_init_run(){
+void mc_computation::load_init_run() {
     double LInit;
     double y0Init;
     double z0Init;
     double y1Init;
     size_t flushNum;
     size_t loopInit;
+    bool moreDataPointsAfterEq;
+    this->strategy(LInit, y0Init, z0Init, y1Init, flushNum, loopInit, moreDataPointsAfterEq);
 
-    this->strategy(LInit,y0Init,z0Init,y1Init,flushNum,loopInit);
-    std::cout<<"LInit="<<LInit<<std::endl;
-    std::cout<<"y0Init="<<y0Init<<std::endl;
-    std::cout<<"z0Init="<<z0Init<<std::endl;
-    std::cout<<"y1Init="<<y1Init<<std::endl;
-    std::cout<<"flushNum="<<flushNum<<std::endl;
-    std::cout<<"loopInit="<<loopInit<<std::endl;
 
-    execute_mc(LInit,y0Init,z0Init,y1Init,loopInit,flushNum);
+    std::cout << "LInit=" << LInit << std::endl;
+    std::cout << "y0Init=" << y0Init << std::endl;
+    std::cout << "z0Init=" << z0Init << std::endl;
+    std::cout << "y1Init=" << y1Init << std::endl;
+    std::cout << "flushNum=" << flushNum << std::endl;
+    std::cout << "loopInit=" << loopInit << std::endl;
 
+    execute_mc(LInit, y0Init, z0Init, y1Init, loopInit, flushNum);
+
+    std::string smrFile = summary_folder + "/summaryFile_" + observable + ".txt";
+    if (moreDataPointsAfterEq == true) {
+        std::cout << "mc executed for " << flushNum << " more flushes." << std::endl;
+        std::ofstream outFile(smrFile, std::ios::app);
+        if (outFile.is_open()) {
+            // Write the text to the file
+            outFile << "mc executed for " << flushNum << " more flushes." << std::endl;
+
+            // Close the file
+            outFile.close();
+        } else {
+            std::cerr << "Unable to open file." << std::endl;
+        }
+
+    }//end of writing to summary file
 
 
 }
