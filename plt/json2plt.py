@@ -10,15 +10,15 @@ import pandas as pd
 
 #This script loads json data and plot
 
-# if (len(sys.argv)!=3):
-#     print("wrong number of arguments")
-#     exit()
+if (len(sys.argv)!=3):
+    print("wrong number of arguments")
+    exit()
 
-funcName="quadratic"
-rowName="row0"
-jsonFolderRoot="../../../dataAll/"+funcName+"/"+rowName+"/jsonOutAll/"
+funcName=sys.argv[1]
+rowName=sys.argv[2]
+jsonFolderRoot="../dataAll/"+funcName+"/"+rowName+"/jsonOutAll/"
 
-inDataFile="../../../inputData/"+funcName+"/quadraticCoeffs.txt"
+inDataFile="../inputData/"+funcName+"/quadraticCoeffs.txt"
 
 line=""
 
