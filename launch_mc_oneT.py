@@ -16,15 +16,15 @@ def format_using_decimal(value):
     formatted_value = decimal_value.quantize(Decimal(1)) if decimal_value == decimal_value.to_integral() else decimal_value.normalize()
     return str(formatted_value)
 
-if (len(sys.argv)!=2):
+if (len(sys.argv)!=4):
     print("wrong number of arguments")
     exit(4)
-TStr=format_using_decimal(sys.argv[1])
+TStr=format_using_decimal(sys.argv[3])
 print(TStr)
 # TStr=sys.argv[1]
 
-funcName="quadratic"
-rowName="row0"
+funcName=sys.argv[1]
+rowName=sys.argv[2]
 
 TFolder="./dataAll/"+funcName+"/"+rowName+"/T"+TStr+"/"
 
