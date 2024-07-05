@@ -13,6 +13,9 @@ include_directories(${Python3_INCLUDE_DIRS})
 
 add_executable(run_mc_load_and_compute run_mc_load_and_compute.cpp mc_subroutine/mc_load_and_compute.cpp)
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build: Debug Release RelWithDebInfo MinSizeRel." FORCE)
+endif()
 
 set_source_files_properties(
         mc_subroutine/mc_load_and_compute.cpp
