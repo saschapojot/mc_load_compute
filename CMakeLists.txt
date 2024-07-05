@@ -4,8 +4,8 @@ project(mc_load_compute)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(Python3_INCLUDE_DIRS "/home/polya/anaconda3/include/python3.9")
-set(Python3_LIBRARIES "/home/polya/anaconda3/lib/libpython3.9.so.1.0")
+set(Python3_INCLUDE_DIRS "/home/polya/anaconda3/include/python3.12")
+set(Python3_LIBRARIES "/home/polya/anaconda3/lib/libpython3.12.so")
 include_directories(${Python3_INCLUDE_DIRS})
 
 
